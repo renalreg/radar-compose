@@ -1,0 +1,50 @@
+version: "3"
+services:
+  # Database
+  db:
+    image: postgres:11
+    restart: always
+    volumes:
+      - data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+  # Backend API
+  radar-api:
+    build: ./radar
+    ports:
+      - "5000:5000"
+    command: radar-api
+    volumes:
+      - ./radar/radar:/radar/radar
+      - ./radar/migrations:/radar/migrations
+    container_name: radar-api
+    depends_on:
+      - db
+  # Backend Admin
+  radar-admin:
+    build: ./radar
+    ports:
+      - "5002:5002"
+    command: radar-admin
+    volumes:
+      - ./radar/radar:/radar/radar
+    container_name: radar-admin
+    depends_on:
+      - db
+  # Frontend
+  radar-client:
+    build: ./radar-client
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./radar-client/src:/app/src
+    container_name: radar-client
+    stdin_open: true
+    tty: true
+    depends_on:
+      - radar-api
+
+volumes:
+  data:
