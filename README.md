@@ -35,28 +35,6 @@ A .env and pgpass.conf are included and provide comments on how the should be po
 $ bash scripts/build_radar.sh
 ```
 
-This should leave you with the following file structure
-
-RADAR\
-|\
-\---radar-compose\
-    |   .env\
-    |   .gitignore\
-    |   docker-compose.yaml\
-    |   LICENSE\
-    |   README.md\
-    |   rebuild_radar.sh\
-    |   
-    +---radar            
-    +---radar-client        
-    \---radar-db
-            build_radar.sh
-            Dockerfile
-            initdb_script.sh
-            pgpass.conf
-            radar_schema.dump
-            radar_tables.dump
-
 ### Destroy
 
 You can run the following to kill the docker containers, remove radar and radar client repos, remove the dump files and delete the database volume. This is useful if something goes wrong during a build and you need to return radar-compose to it's original state. Config files will be left intact.
