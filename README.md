@@ -37,15 +37,15 @@ $ bash scripts/build_radar.sh
 
 This should leave you with the following file structure
 
-RADAR
-|   
-\---radar-compose
-    |   .env
-    |   .gitignore
-    |   docker-compose.yaml
-    |   LICENSE
-    |   README.md
-    |   rebuild_radar.sh
+RADAR\
+|\
+\---radar-compose\
+    |   .env\
+    |   .gitignore\
+    |   docker-compose.yaml\
+    |   LICENSE\
+    |   README.md\
+    |   rebuild_radar.sh\
     |   
     +---radar            
     +---radar-client        
