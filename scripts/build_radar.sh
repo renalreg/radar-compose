@@ -43,8 +43,8 @@ pg_dump --username=radar \
         > ./radar-db/radar_tables.dump
 
 # #--- Clone Radar ---#
-git clone https://github.com/renalreg/radar.git && git -C ./radar checkout Dockerise
-git clone https://github.com/renalreg/radar-client.git && git -C ./radar-client checkout Dockerise
+git clone https://github.com/renalreg/radar.git
+git clone https://github.com/renalreg/radar-client.git
 
 #--- Spin Radar up ---#
 docker compose up -d --build
