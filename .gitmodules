@@ -1,0 +1,6 @@
+[submodule "radar"]
+	path = radar
+	url = https://github.com/renalreg/radar.git
+[submodule "radar-client"]
+	path = radar-client
+	url = https://github.com/renalreg/radar-client.git
