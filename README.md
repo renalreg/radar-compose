@@ -23,16 +23,16 @@ The build setup assumes you have the following software available
 
 ### Clone
 
-Cloning inside a Radar directory is optional but is assumed for documentation purposes.
+Cloning this repo.
 
 ### Configure
 
-A .env and pgpass.conf are included and provide comments on how the should be populated.
+A .env and pgpass.conf are included and provide comments on how they should be populated.
 
 ### Build
 
 ```bash
-$ bash scripts/build_radar.sh
+$ ./scripts/build_radar.sh
 ```
 
 ### Destroy
