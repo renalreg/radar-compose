@@ -1,14 +1,63 @@
-# Radar Development Environment
+# Radar Compose - DOCS UNDER CONSTRUCTION BEWARE
 
-A collection of files required to create a development environment for Radar including a database with required lookup tables
+An all in one compose for development and production environments
 
-### Overview
+### .env variables
 
-This build script is intended to act as a single command development build for Radar. To facilitate this it begins by creating two dump files from an existing Radar database. The first is a schema dump and the second grabs data only from a list of specific tables that are predominantly used for lookups. Example include cohorts and forms. No patient data is dumped.
+An example/template .env file can be found in .env.template
 
-These files are copied to a postgres docker container and are used to create a bare bones Radar database. It also adds you as a user provided you supply the necessary information to enable login.
+```none
+## ----- Database ----- ##
+## ----- Dev only ----- ##
 
-Both Radar and Radar client are cloned and containers created. Radar is spun up in two containers one for radar-api and one for radar-admin. Four containers should be running in total.
+POSTGRES_PASSWORD = password
+USERPASSWORD = password
+USERNAME = sponge.bob
+EMAIL = sponge.bob@email.com
+FIRSTNAME = Spongebob
+LASTNAME = Squarepants
+
+## ----- Flask apps ----- ##
+
+SECRET_KEY = 'SECRET'
+SQLALCHEMY_DATABASE_URI = 'postgres://username:password@route/db'
+
+DEBUG = True
+
+SESSION_TIMEOUT = 3600
+BASE_URL = 'http://address:port'
+LIVE = False
+READ_ONLY = False
+
+UKRDC_SEARCH_ENABLED = True
+UKRDC_SEARCH_URL = 'http://address:port/search'
+UKRDC_SEARCH_TIMEOUT = 60
+
+UKRDC_EXPORTER_URL = 'http://address:port/importandregister'
+UKRDC_EXPORTER_STATE = '/tmp/exporter.state'
+
+CELERY_BROKER_URL = 'amqp://guest@localhost//'
+CELERY_RESULT_BACKEND = 'rpc://'
+CELERY_RESULT_PERSISTENT = False
+
+DEFAULT_INSTRUCTIONS = 'Minimum data to be completed:<br /><ul><li>Demographics</li><li>Primary Diagnosis</li><li>Consultants</li><li>Clinical Picture (if present)</li></ul>'
+
+## ----- Client ----- ##
+
+CLIENT_BASE = '/'
+RADAR_CLIENT_HOST='client'
+RADAR_CLIENT_PORT=****
+
+## ----- NGINX ----- ##
+
+PORT=****
+```
+
+## Deploying Production
+
+Under construction
+
+# Deploying Development
 
 ## System Requirements
 
@@ -18,18 +67,6 @@ The build setup assumes you have the following software available
     * pg_dump
     * bash
 
-Local installs of Node and Python are recommend because you will be editing code from your local machine and it is useful to be able to install some global packages for linting/formatting.
-
-Node install
-
-    * ESLint
-    * Prettier
-
-Python install
-
-    * Black
-    * Flake8
-
 ## Build Setup
 
 ### Clone
@@ -38,7 +75,7 @@ Cloning this repo to C: drive. This repo is untested on networked drives.
 
 ### Configure
 
-A .env and pgpass.conf are included and provide comments on how they should be populated. If you forget to populate these files the compose process will fail to create the Radar database.
+A .env and pgpass.conf are included and provide comments on how they should be populated.
 
 ## Scripts
 
@@ -81,3 +118,9 @@ execute the following to bash into a container. This assumes a windows local OS.
 ```bash
 $ winpty docker exec -it [container name] //bin//bash
 ```
+
+This build script is intended to act as a single command development build for Radar. To facilitate this it begins by creating two dump files from an existing Radar database. The first is a schema dump and the second grabs data only from a list of specific tables that are predominantly used for lookups. Example include cohorts and forms. No patient data is dumped.
+
+These files are copied to a postgres docker container and are used to create a bare bones Radar database. It also adds you as a user provided you supply the necessary information to enable login.
+
+Both Radar and Radar client are cloned and containers created. Radar is spun up in two containers one for radar-api and one for radar-admin. Four containers should be running in total.

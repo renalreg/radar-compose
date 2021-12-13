@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #--- Stop container ---#
-docker compose down
+docker compose -f docker-compose-dev.yaml down
 #--- Delete data volume ---#
 docker volume rm radar-compose_data
 #--- Remove Radar repos ---#

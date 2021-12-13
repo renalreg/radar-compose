@@ -1,9 +1,9 @@
 #!/bin/bash
 
-#--- Password file ---#
+# ----- Password file ----- #
 export PGPASSFILE="./radar-db/pgpass.conf"
 
-#--- Schema dump ---#
+# ----- Schema dump ----- #
 pg_dump --username=radar \
         --host=10.38.181.78 \
         --format=custom \
@@ -11,7 +11,7 @@ pg_dump --username=radar \
         --dbname=radar \
         > ./radar-db/radar_schema.dump
 
-#--- Dump util tables ---#
+# ----- Dump util tables ----- #
 pg_dump --username=radar \
         --host=10.38.181.78 \
         --format=custom \
@@ -42,9 +42,13 @@ pg_dump --username=radar \
         --table=specialties \
         > ./radar-db/radar_tables.dump
 
-# #--- Clone Radar ---#
+# ----- Clone Radar ----- #
 git clone https://github.com/renalreg/radar.git
 git clone https://github.com/renalreg/radar-client.git
 
-#--- Spin Radar up ---#
-docker compose up -d --build
+# ----- Copy Exporter and Importer ----- #
+cp -r ./radar/radar/ukrdc_exporter ./ukrdc-exporter
+cp -r ./radar/radar/ukrdc_importer ./ukrdc-importer
+
+# ----- Spin Radar up ----- #
+docker compose -f docker-compose-dev.yaml up -d --build

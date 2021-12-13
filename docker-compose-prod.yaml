@@ -7,14 +7,18 @@ services:
       - ./radar-nginx:/etc/nginx/templates
     ports:
       - 9998:9998
-    environment:
-      - RADAR_API_HOST=radar-api
-      - RADAR_API_PORT=5000
-      - RADAR_ADMIN_HOST=radar-admin
-      - RADAR_ADMIN_PORT=5002
-      - RADAR_CLIENT_HOST=radar-client
-      - RADAR_CLIENT_PORT=8080
-      - PORT=9998
+    env_file: .env
+    container_name: radar-nginx
+    depends_on:
+      - radar-api
+      - radar-admin
+      - radar-client
+    restart: always
+  ukrdc-import:
+    # image: replace once image location known
+    build: ./ukrdc-import
+    ports:
+      - 9998:9998
     env_file: .env
     container_name: radar-nginx
     depends_on:
