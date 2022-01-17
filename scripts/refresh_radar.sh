@@ -22,6 +22,7 @@ pg_dump --username=radar \
         --format=custom \
         --dbname=radar \
         --data-only \
+        --table=alembic_version \
         --table=codes \
         --table=consents \
         --table=consultants \
