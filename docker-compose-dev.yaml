@@ -1,7 +1,6 @@
 version: "3"
 services:
-
- # Database
+  # Database
   db:
     build: ./radar-db
     restart: always
@@ -12,43 +11,7 @@ services:
     ports:
       - "5432:5432"
     container_name: radar-db
-
-# NGINX
-  radar-nginx:
-    image: nginx:1.20.2
-    volumes:
-      - ./radar-nginx/reverse.conf:/etc/nginx/templates/reverse.conf.template
-    ports:
-      - 9998:9998
-    env_file: .env
-    container_name: radar-nginx
-    hostname: radar-nginx
-    restart: always
-  
-# Frontend
-  radar-client:
-    build: ./radar-client
-    volumes:
-      - ./radar-client/src:/app/src
-      - ./radar-nginx/client.conf:/etc/nginx/templates/client.conf.template
-    container_name: radar-client
-    environment:
-      - NODE_ENV=production
-
-#   # RabbitMQ
-#   radar-rabbit:
-#     image: rabbitmq:3.8-management
-#     ports:
-#       - 15672:15672
-#       - 5672:5672
-#     restart: always
-#     container_name: radar-rabbit
-#     environment:
-#             - RABBITMQ_DEFAULT_USER=guest
-#             - RABBITMQ_DEFAULT_PASS=mypassword
-#     hostname: radar-rabbit
-
-  # API 
+  # Backend API
   radar-api:
     build: ./radar
     ports:
@@ -62,49 +25,33 @@ services:
     container_name: radar-api
     depends_on:
       - db
-      
-#   # Backend Admin
-#   radar-admin:
-#     build: ./radar
-#     ports:
-#       - "5002:5002"
-#     command: radar-admin
-#     volumes:
-#       - ./radar/radar:/radar/radar
-#     env_file:
-#       - .env
-#     container_name: radar-admin
-#     depends_on:
-#       - db
+  # Backend Admin
+  radar-admin:
+    build: ./radar
+    ports:
+      - "5002:5002"
+    command: radar-admin
+    volumes:
+      - ./radar/radar:/radar/radar
+    env_file:
+      - .env
+    container_name: radar-admin
+    depends_on:
+      - db
+  # Frontend
+  radar-client:
+    build: ./radar-client
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./radar-client/src:/app/src
+    env_file:
+      - .env
+    container_name: radar-client
+    stdin_open: true
+    tty: true
+    depends_on:
+      - radar-api
 
-#   # UKRDC Importer
-#   ukrdc-importer:
-#     build: ./radar
-#     ports:
-#       - "5003:5003"
-#     environment:
-#       - FLASK_APP=ukrdc_importer
-#     command: flask run
-#     volumes:
-#       - ./radar/radar:/radar/radar
-#     env_file:
-#       - .env
-#     container_name: ukrdc-importer    
-#     depends_on:
-#       - db
-
-#   # UKRDC Importer Celery Worker
-#   ukrdc-importer-celery-worker:
-#     build: ./radar
-#     command: python3 -m celery -A app worker -n radar.radar.ukrdc_importer -A radar.ukrdc_importer.worker -Q ukrdc_importer --loglevel WARNING
-#     volumes:
-#       - ./radar/radar:/radar/radar
-#     env_file:
-#       - .env
-#     container_name: ukrdc-importer-celery-worker  
-#     depends_on:
-#       - db
-#       - radar-rabbit
- 
 volumes:
   data:
