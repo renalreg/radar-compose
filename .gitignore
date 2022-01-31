@@ -1,2 +1,2 @@
 .env
-radar-db/pgpass.conf
+pgpass.conf
