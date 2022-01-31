@@ -150,3 +150,7 @@ cython_debug/
 
 # Pyenv files
 .python-version
+
+# Container conf
+
+pgpass.conf
