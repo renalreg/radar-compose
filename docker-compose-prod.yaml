@@ -14,31 +14,34 @@ services:
     container_name: radar-db
 
 # NGINX
-  radar-nginx:
-    image: nginx:1.20.2
-    volumes:
-      - ./radar-nginx/reverse.conf:/etc/nginx/templates/reverse.conf.template
-    ports:
-      - 9998:9998
-    environment:
-      - CLIENT_BASE=/
-      - CLIENT_HOST=radar-client
-      - CLIENT_PORT=8080
-      - API_BASE=/api
-      - API_HOST=radar-api
-      - API_PORT=5000
+  # radar-nginx:
+  #   image: nginx:1.20.2
+  #   volumes:
+  #     - ./radar-nginx/reverse.conf:/etc/nginx/templates/reverse.conf.template
+  #   ports:
+  #     - 9998:9998
+  #   environment:
+  #     - PORT=9998
+  #     - CLIENT_BASE=/
+  #     - CLIENT_HOST=radar-client
+  #     - CLIENT_PORT=8080
+  #     - API_BASE=/api
+  #     - API_HOST=radar-api
+  #     - API_PORT=5000
 
       
-    container_name: radar-nginx
-    hostname: radar-nginx
-    restart: always
+  #   container_name: radar-nginx
+  #   hostname: radar-nginx
+  #   restart: always
   
 # Frontend
   radar-client:
     build: ./radar-client
     volumes:
-      - ./radar-client/src:/app/src
       - ./radar-nginx/client.conf:/etc/nginx/templates/client.conf.template
+      
+    ports:
+      - 8080:8080
     env_file:
       - .env
     container_name: radar-client
@@ -63,26 +66,11 @@ services:
     build: ./radar
     ports:
       - "5000:5000"
-    command: radar-api
-    # uwsgi uwsgi.ini 
-    # 
-    volumes:
-      - ./radar/radar:/radar/radar
-      - ./radar/migrations:/radar/migrations
+      - "9191:9191"
+    command: /srv/radar/current/bin/uwsgi --ini /etc/radar-api/uwsgi.ini
+    
     container_name: radar-api
-    environment:
-      - BASE_URL=http://radar_api:8080
-      - SESSION_TIMEOUT=3600
-      - LIVE=False
-      - READ_ONLY=False
-      - UKRDC_SEARCH_ENABLED=True
-      - UKRDC_SEARCH_URL=http://rr-hs-test.northbristol.local:9990/search
-      - UKRDC_SEARCH_TIMEOUT=60
-      - UKRDC_EXPORTER_URL=http://rr-hs-test.northbristol.local:9990/importandregister
-      - UKRDC_EXPORTER_STATE=/tmp/exporter.state
-      - SECRET_KEY=SECRET
-      - SQLALCHEMY_DATABASE_URI=postgres://radar:password@radar-db/radar
-      - DEBUG=True
+
     depends_on:
       - db
       

@@ -6,4 +6,4 @@ COPY . /ukrdc_exporter
 
 ENV RADAR_SETTINGS /radar/example_settings.py
 
-ENV FLASK_ENV development
+ENV FLASK_ENV production
