@@ -1,10 +1,5 @@
 #!/bin/bash
 
-#--- Clean out the old ---#
-docker compose down
-docker volume rm radar-compose_data
-rm radar-db/*.dump
-
 # ----- Password file ----- #
 source ./radar-db/.pgpass
 
@@ -52,5 +47,9 @@ ssh root@10.38.181.78 PGPASSWORD=$PGPASS \
         --table=specialties" \
         > ./radar-db/radar_tables.dump
 
-#--- Spin Radar up ---#
-docker compose up -d --build
+# ----- Clone Radar ----- #
+git clone https://github.com/renalreg/radar.git
+git clone https://github.com/renalreg/radar-client.git
+
+# ----- Spin Radar up ----- #
+docker compose -f docker-compose-dev.yaml up -d --build

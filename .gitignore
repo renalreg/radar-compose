@@ -153,4 +153,12 @@ cython_debug/
 
 # Container conf
 
-pgpass.conf
+.pgpass
+
+# Database dumps
+
+*.dump
+
+# Build file
+
+*.tar.gz
