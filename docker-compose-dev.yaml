@@ -43,6 +43,7 @@ services:
     build: ./radar-client
     ports:
       - "8080:8080"
+    command: npm start
     volumes:
       - ./radar-client/src:/app/src
     env_file:
