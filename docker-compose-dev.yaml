@@ -13,7 +13,10 @@ services:
     container_name: radar-db
   # Backend API
   radar-api:
-    build: ./radar
+    build:
+      context: ./radar
+      dockerfile: Dockerfile
+      target: dev
     ports:
       - "5000:5000"
     command: radar-api
@@ -27,7 +30,10 @@ services:
       - db
   # Backend Admin
   radar-admin:
-    build: ./radar
+    build:
+      context: ./radar
+      dockerfile: Dockerfile
+      target: dev
     ports:
       - "5002:5002"
     command: radar-admin
@@ -40,7 +46,10 @@ services:
       - db
   # Frontend
   radar-client:
-    build: ./radar-client
+    build: 
+      context: ./radar-client
+      dockerfile: Dockerfile
+      target: dev
     ports:
       - "8080:8080"
     command: npm start
@@ -49,8 +58,6 @@ services:
     env_file:
       - .env
     container_name: radar-client
-    stdin_open: true
-    tty: true
     depends_on:
       - radar-api
 
