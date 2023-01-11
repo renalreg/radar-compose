@@ -72,13 +72,14 @@ services:
     command: /srv/radar/current/bin/uwsgi --ini /etc/radar-api/uwsgi.ini
     volumes:
       - ./uwsgi.ini:/etc/radar-api/uwsgi.ini
+      - ./settings.py:/etc/radar-api/settings.py
+      - ./secret_key:/etc/radar-api/secret_key
       - ./api_uwsgi.log:/var/log/uwsgi/api_uwsgi.log
-    
+    environment:
+      - RADAR_SETTINGS=/etc/radar-api/settings.py
     container_name: radar-api
-
     depends_on:
       - db
-
     tty: true
     stdin_open: true
 
