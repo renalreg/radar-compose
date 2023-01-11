@@ -35,18 +35,20 @@ services:
   #   restart: always
   
 # Frontend
-  radar-client:
-    build: ./radar-client
-    volumes:
-      - ./radar-nginx/client.conf:/etc/nginx/templates/client.conf.template
+  # radar-client:
+  #   build: ./radar-client
+  #   # volumes:
+  #   #   - ./radar-nginx/client.conf:/etc/nginx/templates/client.conf.template
       
-    ports:
-      - 8080:8080
-    env_file:
-      - .env
-    container_name: radar-client
-    environment:
-      - NODE_ENV=production
+  #   ports:
+  #     - 8080:8080
+  #   env_file:
+  #     - .env
+  #   container_name: radar-client
+  #   environment:
+  #     - NODE_ENV=production
+
+
 
 #   # RabbitMQ
 #   radar-rabbit:
@@ -61,18 +63,26 @@ services:
 #             - RABBITMQ_DEFAULT_PASS=mypassword
 #     hostname: radar-rabbit
 
-  # API 
+  #API 
   radar-api:
     build: ./radar
     ports:
       - "5000:5000"
       - "9191:9191"
     command: /srv/radar/current/bin/uwsgi --ini /etc/radar-api/uwsgi.ini
+    volumes:
+      - ./uwsgi.ini:/etc/radar-api/uwsgi.ini
+      - ./api_uwsgi.log:/var/log/uwsgi/api_uwsgi.log
     
     container_name: radar-api
 
     depends_on:
       - db
+
+    tty: true
+    stdin_open: true
+
+
       
 #   # Backend Admin
 #   radar-admin:
