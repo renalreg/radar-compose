@@ -161,3 +161,11 @@ cython_debug/
 # Build file
 
 *.tar.gz
+
+# Logs
+
+logs/
+
+# Settings
+
+settings/
