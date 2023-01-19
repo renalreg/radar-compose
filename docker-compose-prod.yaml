@@ -8,7 +8,7 @@ services:
     volumes:
       - data:/var/lib/postgresql/data
     env_file:
-      - .env
+      - ./settings/.env
     container_name: radar-db
 
   # NGINX
@@ -16,8 +16,8 @@ services:
     image: nginx:1.20.2
     volumes:
       - ./radar-nginx:/etc/nginx/templates
-      - ./nginx-access.log:/var/log/nginx/nginx-access.log
-      - ./nginx-error.log:/var/log/nginx/nginx-error.log
+      - ./logs/nginx-access.log:/var/log/nginx/nginx-access.log
+      - ./logs/nginx-error.log:/var/log/nginx/nginx-error.log
     ports:
       - 9998:9998
     environment:
@@ -54,11 +54,13 @@ services:
   radar-api:
     build: ./radar
     command: /srv/radar/current/bin/uwsgi --ini /etc/radar-api/uwsgi.ini
+    ports:
+      - 5000:5000
     volumes:
-      - ./uwsgi.ini:/etc/radar-api/uwsgi.ini
-      - ./settings.py:/etc/radar-api/settings.py
-      - ./secret_key:/etc/radar-api/secret_key
-      - ./api_uwsgi.log:/var/log/uwsgi/api_uwsgi.log
+      - ./settings/uwsgi.ini:/etc/radar-api/uwsgi.ini
+      - ./settings/settings.py:/etc/radar-api/settings.py
+      - ./settings/secret_key:/etc/radar-api/secret_key
+      - ./logs/api_uwsgi.log:/var/log/uwsgi/api_uwsgi.log
     environment:
       - RADAR_SETTINGS=/etc/radar-api/settings.py
     container_name: radar-api
