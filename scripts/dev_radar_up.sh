@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # ----- Password file ----- #
-source ./radar-db/.pgpass
+source ./settings/.pgpass
 
 # ----- Schema dump ----- #
-ssh root@10.38.181.78 PGPASSWORD=$PGPASS \
+ssh $SSHUSER@$DBIP PGPASSWORD=$PGPASS \
         "pg_dump \
         --username=radar \
         --host=localhost \
@@ -16,7 +16,7 @@ ssh root@10.38.181.78 PGPASSWORD=$PGPASS \
 
 # ----- Dump util tables ----- #
 
-ssh root@10.38.181.78 PGPASSWORD=$PGPASS \
+ssh $SSHUSER@$DBIP PGPASSWORD=$PGPASS \
 "pg_dump --username=radar \
         --host=localhost \
         --format=custom \
@@ -46,10 +46,6 @@ ssh root@10.38.181.78 PGPASSWORD=$PGPASS \
         --table=observations \
         --table=specialties" \
         > ./radar-db/radar_tables.dump
-
-# ----- Clone Radar ----- #
-git clone https://github.com/renalreg/radar.git
-git clone https://github.com/renalreg/radar-client.git
 
 # ----- Spin Radar up ----- #
 docker compose -f docker-compose-dev.yaml up -d --build
