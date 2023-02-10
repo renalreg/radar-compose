@@ -8,7 +8,9 @@ This repo includes two submodules, Radar and Radar client. To automatically init
 
 <br />
 
-`git clone --recurse-submodules --branch adapt-for-production  https://github.com/renalreg/radar-compose.git`
+```bash
+$ git clone --recurse-submodules --branch adapt-for-production  https://github.com/renalreg/radar-compose.git
+```
 
 <br />
 
@@ -20,23 +22,21 @@ This repo includes two submodules, Radar and Radar client. To automatically init
 
 Create a directory at the root of the project called settings. Inside this directory you will need two files
 
-```Bash
+```
 settings
     .env
     .pgpass
 ```
 
-### .env variables
+## .env variables
 
-```none
-## ----- Database ----- ##
-
-POSTGRES_PASSWORD =
+```ini
+POSTGRES_PASSWORD = ""
 USERPASSWORD = ''
-USERNAME =
-EMAIL =
-FIRSTNAME =
-LASTNAME =
+USERNAME = ""
+EMAIL = ""
+FIRSTNAME = ""
+LASTNAME = ""
 ```
 
 POSTGRES_PASSWORD can be anything and is used to set the password in your local DB running inside a docker container.
@@ -45,9 +45,9 @@ The rest of the variables will be used to create a user locally to allow you to 
 
 > :warning: **Currently you need to supply a hashed password. The easiest way to do this is to copy the hashed password from live or staging Radar. This must be in single quotes**
 
-### .pgpass variables
+## .pgpass variables
 
-```none
+```ini
 PGPASS=""
 SSHUSER=""
 DBIP=""
@@ -55,7 +55,9 @@ DBIP=""
 
 These are the details of the DB you are using to create your local copy, ideally use Radar live.
 
-With these files in place run the dev_radar_up.sh script found in the scripts directory.
+With these files in place run the dev_radar_up.sh script found in the scripts directory. See below for details.
+
+<br />
 
 # Dev Scrpits
 
@@ -91,12 +93,78 @@ $ bash scripts/refresh_radar.sh
 
 ## Build
 
-To build deployment packages for Radar run the build script. This will remove any old deployment packages you have if you have any, add a dist directory to the project, build the packages required inside the docker containers then copy them out ready for deployment. Follow the Radar deployment documentation.
+To build deployment packages for Radar run the build script. This will remove any old deployment packages you have if you have any, add a dist directory to the project, build the packages required inside the docker containers then copy them out ready for deployment. Follow the Radar deployment documentation to deploy.
 
 ```bash
 $ bash scripts/build_radar.sh
 ```
 
-# Deploying Production
+<br />
 
-Under construction
+# Setting up a Production Instance
+
+Create a directory at the root of the project called settings. Inside this directory you will need three files
+
+```
+settings
+    secret_key
+    settings.py
+    uwsgi.ini
+```
+
+## secret_key
+
+This simply needs a long random string. No need to assign it to anything
+
+## settings.py
+
+```ini
+SECRET_KEY = open("/path/to/secret_key_file", "rb").read()
+SQLALCHEMY_DATABASE_URI = "postgres://radar:password@radar-db/radar"
+SESSION_TIMEOUT = 3600
+BASE_URL = "https://nww.radar.nhs.uk/#"
+LIVE = True
+READ_ONLY = False
+
+CELERY_BROKER_URL = "amqp://guest@localhost//"
+CELERY_RESULT_BACKEND = "rpc://"
+CELERY_RESULT_PERSISTENT = False
+
+UKRDC_SEARCH_ENABLED = False
+UKRDC_SEARCH_URL = "https://nww.ukrdc.nhs.uk:9990/search"
+
+DEFAULT_INSTRUCTIONS = "Minimum data to be completed:<br /><ul><li>Demographics</li><li>Primary Diagnosis</li><li>Consultants</li><li>Clinical Picture (if present)</li></ul>"
+```
+
+The database URI assumes a local docker container running the database. The password will need to be altered. In most cases this will need pointing at one of the remote Radar instances.
+
+Fill in the path to the secret key file.
+
+## uwsgi.ini
+
+```ini
+[uwsgi]
+master = 1
+
+# Bind and use the uwsgi protocol
+uwsgi-socket = 0.0.0.0:5000
+
+# Concurrency
+processes = 12
+threads = 2
+
+# WSGI module location
+virtualenv = /srv/radar/current
+module = radar.api.app:RadarAPI()
+
+# Run as radar
+uid = radar
+gid = radar
+
+# Force uWSGI to use the latest version on reload
+# http://lists.unbit.it/pipermail/uwsgi/2013-August/006314.html
+binary-path = /srv/radar/current/bin/uwsgi
+
+# Log to a file
+logto = /var/log/uwsgi/api_uwsgi.log
+```
