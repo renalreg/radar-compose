@@ -1,15 +1,10 @@
 #!/bin/bash
 
-#--- Clean out the old ---#
-docker compose down
-docker volume rm radar-compose_data
-rm radar-db/*.dump
-
 # ----- Password file ----- #
-source ./radar-db/.pgpass
+source ./settings/.pgpass
 
 # ----- Schema dump ----- #
-ssh root@10.38.181.78 PGPASSWORD=$PGPASS \
+ssh $SSHUSER@$DBIP PGPASSWORD=$PGPASS \
         "pg_dump \
         --username=radar \
         --host=localhost \
@@ -21,13 +16,12 @@ ssh root@10.38.181.78 PGPASSWORD=$PGPASS \
 
 # ----- Dump util tables ----- #
 
-ssh root@10.38.181.78 PGPASSWORD=$PGPASS \
+ssh $SSHUSER@$DBIP PGPASSWORD=$PGPASS \
 "pg_dump --username=radar \
         --host=localhost \
         --format=custom \
         --dbname=radar \
         --data-only \
-        --table=alembic_version \
         --table=codes \
         --table=consents \
         --table=consultants \
@@ -53,5 +47,5 @@ ssh root@10.38.181.78 PGPASSWORD=$PGPASS \
         --table=specialties" \
         > ./radar-db/radar_tables.dump
 
-#--- Spin Radar up ---#
-docker compose up -d --build
+# ----- Spin Radar up ----- #
+docker compose -f docker-compose-dev.yaml up -d --build

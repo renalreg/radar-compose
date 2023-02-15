@@ -7,43 +7,57 @@ services:
     volumes:
       - data:/var/lib/postgresql/data
     env_file:
-      - .env
+      - ./settings/.env
     ports:
       - "5432:5432"
     container_name: radar-db
   # Backend API
   radar-api:
-    build: ./radar
+    build:
+      context: ./radar
+      dockerfile: Dockerfile
+      target: dev
     ports:
       - "5000:5000"
     command: radar-api
     volumes:
       - ./radar/radar:/radar/radar
       - ./radar/migrations:/radar/migrations
+    env_file:
+      - ./settings/.env
     container_name: radar-api
     depends_on:
       - db
   # Backend Admin
   radar-admin:
-    build: ./radar
+    build:
+      context: ./radar
+      dockerfile: Dockerfile
+      target: dev
     ports:
       - "5002:5002"
     command: radar-admin
     volumes:
       - ./radar/radar:/radar/radar
+    env_file:
+      - ./settings/.env
     container_name: radar-admin
     depends_on:
       - db
   # Frontend
   radar-client:
-    build: ./radar-client
+    build: 
+      context: ./radar-client
+      dockerfile: Dockerfile
+      target: dev
     ports:
       - "8080:8080"
+    command: npm start
     volumes:
       - ./radar-client/src:/app/src
+    env_file:
+      - ./settings/.env
     container_name: radar-client
-    stdin_open: true
-    tty: true
     depends_on:
       - radar-api
 

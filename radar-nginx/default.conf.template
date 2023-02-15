@@ -1,0 +1,19 @@
+server {
+    listen ${PORT};
+    listen [::]:${PORT};
+
+    access_log /var/log/nginx/nginx-access.log;
+    error_log /var/log/nginx/nginx-error.log;
+
+    location ${CLIENT_BASE} {
+        proxy_pass http://${CLIENT_HOST}:${CLIENT_PORT};
+    }
+
+    location ${API_BASE} {
+        rewrite ^/api/?(.*) /$1 break;
+        uwsgi_read_timeout 1200s;
+        uwsgi_send_timeout 1200s;
+        uwsgi_pass ${API_HOST}:${API_PORT};
+        include /etc/nginx/uwsgi_params;
+    }
+}
