@@ -9,6 +9,7 @@ CLIENT_DIST_PATH=$(docker exec radar-client //usr//bin//find //app -name radar-c
 docker cp radar-client:$CLIENT_DIST_PATH ./radar-release/
 
 # --- API --- #
+docker exec radar-api //usr//bin//rm //radar//dist -rf radar-*-linux-x86_64.tar.gz
 docker exec -it radar-api //bin//bash -c 'source //radar//venv//bin//activate && platter build --virtualenv-version 15.1.0 -p python3 -r requirements.txt .'
 API_DIST_PATH=$(docker exec radar-api //usr//bin//find //radar -name radar-*-linux-x86_64.tar.gz)
 docker cp radar-api:$API_DIST_PATH ./radar-release/
