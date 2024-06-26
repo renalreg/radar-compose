@@ -1,5 +1,8 @@
 #!/bin/bash
 
+docker compose -f docker-compose-dev.yaml down
+docker compose -f docker-compose-dev.yaml up -d --build
+
 rm -rf radar-release
 mkdir radar-release
 
