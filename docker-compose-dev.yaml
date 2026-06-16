@@ -17,6 +17,8 @@ services:
       context: ./radar
       dockerfile: Dockerfile
       target: dev
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "5000:5000"
     command: radar-api
@@ -28,12 +30,15 @@ services:
     container_name: radar-api
     depends_on:
       - db
+
   # Backend Admin
   radar-admin:
     build:
       context: ./radar
       dockerfile: Dockerfile
       target: dev
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "5002:5002"
     command: radar-admin
@@ -44,14 +49,67 @@ services:
     container_name: radar-admin
     depends_on:
       - db
+
+  # UKRDC Importer API
+  radar-ukrdc-importer-api:
+    build:
+      context: ./radar
+      dockerfile: Dockerfile
+      target: dev
+    ports:
+      - "5001:5001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: flask --app radar.ukrdc_importer.api:create_app run --host 0.0.0.0 --port 5001
+    volumes:
+      - ./radar/radar:/radar/radar
+    env_file:
+      - ./settings/.env
+    container_name: radar-ukrdc-importer-api
+    depends_on:
+      - db
+
+  # UKRDC Importer Celery worker
+  radar-ukrdc-importer-celery:
+    build:
+      context: ./radar
+      dockerfile: Dockerfile
+      target: dev
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: celery -A radar.ukrdc_importer.worker worker -Q ukrdc_importer --loglevel INFO
+    volumes:
+      - ./radar/radar:/radar/radar
+    env_file:
+      - ./settings/.env
+    container_name: radar-ukrdc-importer-celery
+    depends_on:
+      - db
+
+  # UKRDC Exporter Celery worker
+  radar-ukrdc-exporter-celery:
+    build:
+      context: ./radar
+      dockerfile: Dockerfile
+      target: dev
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: celery -A radar.ukrdc_exporter.worker worker -Q ukrdc_exporter --loglevel INFO
+    volumes:
+      - ./radar/radar:/radar/radar
+    env_file:
+      - ./settings/.env
+    container_name: radar-ukrdc-exporter-celery
+    depends_on:
+      - db
   # Frontend
   radar-client:
-    build: 
+    build:
       context: ./radar-client
       dockerfile: Dockerfile
       target: dev
     ports:
-      - "8080:8080"
+      - "8081:8080"
     command: npm start
     volumes:
       - ./radar-client/src:/app/src
