@@ -1,25 +1,51 @@
-version: "3"
-services:
+x-radar-image: &radar-image
+  build:
+    context: ./radar
+    dockerfile: Dockerfile
+    target: prod
+  image: radar:${RADAR_VERSION:-latest}
+  restart: unless-stopped
+  depends_on:
+    - db
 
+services:
   # Database
   db:
     build: ./radar-db
-    restart: always
+    restart: unless-stopped
     volumes:
       - data:/var/lib/postgresql/data
     env_file:
       - ./settings/.env
     container_name: radar-db
 
-  # NGINX
+  # RabbitMQ - runs on the host already (matches old setup), not containerized.
+  # CELERY_BROKER_URL in settings/*.env must point at the host, not localhost,
+  # since localhost inside a container resolves to the container itself.
+  # radar-rabbit:
+  #   image: rabbitmq:3.8-management
+  #   restart: unless-stopped
+  #   container_name: radar-rabbit
+  #   hostname: radar-rabbit
+  #   environment:
+  #     - RABBITMQ_DEFAULT_USER=guest
+  #     - RABBITMQ_DEFAULT_PASS=guest
+  #   ports:
+  #     - "5672:5672"
+  #     - "15672:15672"
+
+  # NGINX - reverse proxy in front of all uwsgi services
   radar-nginx:
     image: nginx:1.20.2
+    restart: unless-stopped
+    container_name: radar-nginx
+    hostname: radar-nginx
     volumes:
       - ./radar-nginx:/etc/nginx/templates
       - ./logs/nginx-access.log:/var/log/nginx/nginx-access.log
       - ./logs/nginx-error.log:/var/log/nginx/nginx-error.log
     ports:
-      - 9998:9998
+      - "9998:9998"
     environment:
       - PORT=9998
       - CLIENT_BASE=/
@@ -28,89 +54,138 @@ services:
       - API_BASE=/api
       - API_HOST=radar-api
       - API_PORT=5000
-    container_name: radar-nginx
-    hostname: radar-nginx
-    restart: always
-    
+      - ADMIN_BASE=/admin
+      - ADMIN_HOST=radar-admin
+      - ADMIN_PORT=5002
+      - UKRDC_IMPORTER_BASE=/ukrdc-importer
+      - UKRDC_IMPORTER_HOST=radar-ukrdc-importer-api
+      - UKRDC_IMPORTER_PORT=5001
+    depends_on:
+      - radar-api
+      - radar-admin
+      - radar-ukrdc-importer-api
+
+  # API - uwsgi, module radar.api.app:RadarAPI()
+  radar-api:
+    <<: *radar-image
+    container_name: radar-api
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - uwsgi
+      - --master
+      - --processes
+      - "6"
+      - --threads
+      - "2"
+      - --uwsgi-socket
+      - 0.0.0.0:5000
+      - --virtualenv
+      - /usr/local
+      - --module
+      - radar.api.app:RadarAPI()
+    env_file:
+      - ./settings/api.env
+    volumes:
+      - ./logs/api_uwsgi.log:/var/log/uwsgi/api_uwsgi.log
+
+  # Admin - uwsgi, module radar.admin.app:RadarAdmin()
+  radar-admin:
+    <<: *radar-image
+    container_name: radar-admin
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - uwsgi
+      - --master
+      - --processes
+      - "6"
+      - --threads
+      - "2"
+      - --uwsgi-socket
+      - 0.0.0.0:5002
+      - --virtualenv
+      - /usr/local
+      - --module
+      - radar.admin.app:RadarAdmin()
+    env_file:
+      - ./settings/admin.env
+
+  # UKRDC Importer API - uwsgi, module radar.ukrdc_importer.api:create_app()
+  radar-ukrdc-importer-api:
+    <<: *radar-image
+    container_name: radar-ukrdc-importer-api
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - uwsgi
+      - --master
+      - --processes
+      - "6"
+      - --threads
+      - "2"
+      - --uwsgi-socket
+      - 0.0.0.0:5001
+      - --virtualenv
+      - /usr/local
+      - --module
+      - radar.ukrdc_importer.api:create_app()
+    env_file:
+      - ./settings/ukrdc-importer.env
+
+  # UKRDC Importer Celery worker - queue: ukrdc_importer
+  # Connects to RabbitMQ running on the host (CELERY_BROKER_URL in env file
+  # must point at the host, e.g. amqp://guest@host.docker.internal// — not localhost)
+  radar-ukrdc-importer-celery:
+    <<: *radar-image
+    container_name: radar-ukrdc-importer-celery
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - celery
+      - -A
+      - radar.ukrdc_importer.worker
+      - worker
+      - -n
+      - ukrdc_importer@%h
+      - -Q
+      - ukrdc_importer
+      - --loglevel
+      - WARNING
+    env_file:
+      - ./settings/ukrdc-importer.env
+
+  # UKRDC Exporter Celery worker - queue: ukrdc_exporter
+  # Connects to RabbitMQ running on the host, same as importer above
+  radar-ukrdc-exporter-celery:
+    <<: *radar-image
+    container_name: radar-ukrdc-exporter-celery
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - celery
+      - -A
+      - radar.ukrdc_exporter.worker
+      - worker
+      - -n
+      - ukrdc_exporter@%h
+      - -Q
+      - ukrdc_exporter
+      - --loglevel
+      - WARNING
+    env_file:
+      - ./settings/ukrdc-exporter.env
+
   # Frontend
   radar-client:
-    build: ./radar-client
+    build:
+      context: ./radar-client
+      dockerfile: Dockerfile
+      target: prod
+    restart: unless-stopped
     container_name: radar-client
-
-  #   # RabbitMQ
-  #   radar-rabbit:
-  #     image: rabbitmq:3.8-management
-  #     ports:
-  #       - 15672:15672
-  #       - 5672:5672
-  #     restart: always
-  #     container_name: radar-rabbit
-  #     environment:
-  #             - RABBITMQ_DEFAULT_USER=guest
-  #             - RABBITMQ_DEFAULT_PASS=mypassword
-  #     hostname: radar-rabbit
-
-  #API 
-  radar-api:
-    build: ./radar
-    command: /srv/radar/current/bin/uwsgi --ini /etc/radar-api/uwsgi.ini
-    ports:
-      - 5000:5000
-    volumes:
-      - ./settings/uwsgi.ini:/etc/radar-api/uwsgi.ini
-      - ./settings/settings.py:/etc/radar-api/settings.py
-      - ./settings/secret_key:/etc/radar-api/secret_key
-      - ./logs/api_uwsgi.log:/var/log/uwsgi/api_uwsgi.log
-    environment:
-      - RADAR_SETTINGS=/etc/radar-api/settings.py
-    container_name: radar-api
     depends_on:
-      - db
+      - radar-api
 
 volumes:
   data:
-
-  # Backend Admin
-  # radar-admin:
-  #   build: ./radar
-  #   ports:
-  #     - "5002:5002"
-  #   command: radar-admin
-  #   volumes:
-  #     - ./radar/radar:/radar/radar
-  #   env_file:
-  #     - .env
-  #   container_name: radar-admin
-  #   depends_on:
-  #     - db
-
-#   # UKRDC Importer
-#   ukrdc-importer:
-#     build: ./radar
-#     ports:
-#       - "5003:5003"
-#     environment:
-#       - FLASK_APP=ukrdc_importer
-#     command: flask run
-#     volumes:
-#       - ./radar/radar:/radar/radar
-#     env_file:
-#       - .env
-#     container_name: ukrdc-importer    
-#     depends_on:
-#       - db
-
-#   # UKRDC Importer Celery Worker
-#   ukrdc-importer-celery-worker:
-#     build: ./radar
-#     command: python3 -m celery -A app worker -n radar.radar.ukrdc_importer -A radar.ukrdc_importer.worker -Q ukrdc_importer --loglevel WARNING
-#     volumes:
-#       - ./radar/radar:/radar/radar
-#     env_file:
-#       - .env
-#     container_name: ukrdc-importer-celery-worker  
-#     depends_on:
-#       - db
-#       - radar-rabbit
-
-
