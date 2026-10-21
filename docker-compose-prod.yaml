@@ -1,116 +1,185 @@
-version: "3"
+x-radar-image: &radar-image
+  build:
+    context: ./radar
+    dockerfile: Dockerfile
+    target: prod
+  image: radar:${RADAR_VERSION:-latest}
+  restart: unless-stopped
+
 services:
+  # No `db` service here - production Postgres already runs independently
+  # (the old settings.py files pointed at db.staging.radar.nhs.uk, a real
+  # dedicated host). The db: service in docker-compose-dev.yaml is purely
+  # a local-dev convenience and should stay dev-only.
 
-  # Database
-  db:
-    build: ./radar-db
-    restart: always
-    volumes:
-      - data:/var/lib/postgresql/data
-    env_file:
-      - ./settings/.env
-    container_name: radar-db
+  # RabbitMQ stays on the host. guest is loopback-restricted by default
+  # (RabbitMQ's loopback_users setting), so services reaching the broker
+  # via host.docker.internal get ACCESS_REFUSED - that's not a loopback
+  # connection from RabbitMQ's point of view. radar-api and
+  # radar-ukrdc-importer-api still hit this today; not yet fixed - see
+  # open items. The two Celery workers below are fixed via
+  # network_mode: host instead, since neither publishes any ports.
 
-  # NGINX
-  radar-nginx:
-    image: nginx:1.20.2
-    volumes:
-      - ./radar-nginx:/etc/nginx/templates
-      - ./logs/nginx-access.log:/var/log/nginx/nginx-access.log
-      - ./logs/nginx-error.log:/var/log/nginx/nginx-error.log
-    ports:
-      - 9998:9998
-    environment:
-      - PORT=9998
-      - CLIENT_BASE=/
-      - CLIENT_HOST=radar-client
-      - CLIENT_PORT=80
-      - API_BASE=/api
-      - API_HOST=radar-api
-      - API_PORT=5000
-    container_name: radar-nginx
-    hostname: radar-nginx
-    restart: always
-    
-  # Frontend
-  radar-client:
-    build: ./radar-client
-    container_name: radar-client
-
-  #   # RabbitMQ
-  #   radar-rabbit:
-  #     image: rabbitmq:3.8-management
-  #     ports:
-  #       - 15672:15672
-  #       - 5672:5672
-  #     restart: always
-  #     container_name: radar-rabbit
-  #     environment:
-  #             - RABBITMQ_DEFAULT_USER=guest
-  #             - RABBITMQ_DEFAULT_PASS=mypassword
-  #     hostname: radar-rabbit
-
-  #API 
+  # API - published to 127.0.0.1 only, same as the old uwsgi socket did.
+  # Host nginx's existing upstream (127.0.0.1:5000) needs no changes.
+  # KNOWN ISSUE: currently crash-looping on startup - PermissionError
+  # reading /etc/radar-api/secret_key inside the container. Not yet
+  # diagnosed - check `docker compose exec radar-api id` and the host-side
+  # file permissions on settings/radar-api/secret_key before relying on
+  # this service.
   radar-api:
-    build: ./radar
-    command: /srv/radar/current/bin/uwsgi --ini /etc/radar-api/uwsgi.ini
-    ports:
-      - 5000:5000
-    volumes:
-      - ./settings/uwsgi.ini:/etc/radar-api/uwsgi.ini
-      - ./settings/settings.py:/etc/radar-api/settings.py
-      - ./settings/secret_key:/etc/radar-api/secret_key
-      - ./logs/api_uwsgi.log:/var/log/uwsgi/api_uwsgi.log
+    <<: *radar-image
+    container_name: radar-api
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    stop_signal: SIGQUIT
+    command:
+      - uwsgi
+      - --master
+      - --processes
+      - "6"
+      - --threads
+      - "2"
+      - --uwsgi-socket
+      - 0.0.0.0:5000
+      - --virtualenv
+      - /usr/local
+      - --module
+      - radar.api.app:RadarAPI()
     environment:
       - RADAR_SETTINGS=/etc/radar-api/settings.py
-    container_name: radar-api
-    depends_on:
-      - db
+    volumes:
+      - ./settings/radar-api/settings.py:/etc/radar-api/settings.py:ro
+      - ./settings/radar-api/secret_key:/etc/radar-api/secret_key:ro
+      - ./logs/api_uwsgi.log:/var/log/uwsgi/api_uwsgi.log
+    ports:
+      - "127.0.0.1:5000:5000"
 
-volumes:
-  data:
+  # Admin - published to 127.0.0.1:5002, matching the old socket.
+  # Note: admin's settings.py reads SECRET_KEY from /etc/radar-api/secret_key,
+  # not its own path - same file mounted here as in radar-api.
+  # Likely hits the same secret_key PermissionError as radar-api above -
+  # unconfirmed, check logs once radar-api's issue is diagnosed.
+  radar-admin:
+    <<: *radar-image
+    container_name: radar-admin
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    stop_signal: SIGQUIT
+    command:
+      - uwsgi
+      - --master
+      - --processes
+      - "6"
+      - --threads
+      - "2"
+      - --uwsgi-socket
+      - 0.0.0.0:5002
+      - --virtualenv
+      - /usr/local
+      - --module
+      - radar.admin.app:RadarAdmin()
+    environment:
+      - RADAR_SETTINGS=/etc/radar-admin/settings.py
+    volumes:
+      - ./settings/radar-admin/settings.py:/etc/radar-admin/settings.py:ro
+      - ./settings/radar-api/secret_key:/etc/radar-api/secret_key:ro
+      - /var/radar-exports:/var/radar-exports
+    ports:
+      - "127.0.0.1:5002:5002"
 
-  # Backend Admin
-  # radar-admin:
-  #   build: ./radar
-  #   ports:
-  #     - "5002:5002"
-  #   command: radar-admin
-  #   volumes:
-  #     - ./radar/radar:/radar/radar
-  #   env_file:
-  #     - .env
-  #   container_name: radar-admin
-  #   depends_on:
-  #     - db
+  # UKRDC Importer API - published to 127.0.0.1:5001, matching the old socket.
+  # Stays on bridge networking + host.docker.internal - not yet moved off
+  # guest/RabbitMQ fix. Will hit the same ACCESS_REFUSED as the workers did
+  # once it actually tries to publish a task - not yet confirmed since
+  # nothing has exercised that path yet.
+  radar-ukrdc-importer-api:
+    <<: *radar-image
+    container_name: radar-ukrdc-importer-api
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    stop_signal: SIGQUIT
+    command:
+      - uwsgi
+      - --master
+      - --processes
+      - "6"
+      - --threads
+      - "2"
+      - --uwsgi-socket
+      - 0.0.0.0:5001
+      - --virtualenv
+      - /usr/local
+      - --module
+      - radar.ukrdc_importer.api:create_app()
+    environment:
+      - RADAR_SETTINGS=/etc/radar-ukrdc-importer/settings.py
+    volumes:
+      - ./settings/radar-ukrdc-importer-api/settings.py:/etc/radar-ukrdc-importer/settings.py:ro
+    ports:
+      - "127.0.0.1:5001:5001"
 
-#   # UKRDC Importer
-#   ukrdc-importer:
-#     build: ./radar
-#     ports:
-#       - "5003:5003"
-#     environment:
-#       - FLASK_APP=ukrdc_importer
-#     command: flask run
-#     volumes:
-#       - ./radar/radar:/radar/radar
-#     env_file:
-#       - .env
-#     container_name: ukrdc-importer    
-#     depends_on:
-#       - db
+  # UKRDC Importer Celery worker - no ports published, so network_mode: host
+  # carries no exposure risk. Needed because RabbitMQ's guest user is
+  # loopback-restricted; host networking makes the broker connection a
+  # genuine loopback connection. CELERY_BROKER_URL in this service's
+  # settings.py is amqp://guest@localhost// - NOT host.docker.internal,
+  # since this container IS the host's network namespace now.
+  radar-ukrdc-importer-celery:
+    <<: *radar-image
+    container_name: radar-ukrdc-importer-celery
+    network_mode: host
+    command:
+      - celery
+      - -A
+      - radar.ukrdc_importer.worker
+      - worker
+      - -n
+      - ukrdc_importer@%h
+      - -Q
+      - ukrdc_importer
+      - --loglevel
+      - WARNING
+    environment:
+      - RADAR_SETTINGS=/etc/radar-ukrdc-importer/settings.py
+    volumes:
+      - ./settings/radar-ukrdc-importer-celery/settings.py:/etc/radar-ukrdc-importer/settings.py:ro
 
-#   # UKRDC Importer Celery Worker
-#   ukrdc-importer-celery-worker:
-#     build: ./radar
-#     command: python3 -m celery -A app worker -n radar.radar.ukrdc_importer -A radar.ukrdc_importer.worker -Q ukrdc_importer --loglevel WARNING
-#     volumes:
-#       - ./radar/radar:/radar/radar
-#     env_file:
-#       - .env
-#     container_name: ukrdc-importer-celery-worker  
-#     depends_on:
-#       - db
-#       - radar-rabbit
+  # UKRDC Exporter Celery worker - same network_mode: host reasoning as
+  # importer-celery above. State file is the producer's log-cursor, written
+  # by the exporter-changed/-all systemd timers via `docker compose exec`
+  # into this container - must persist across container recreates, hence
+  # the bind mount below.
+  radar-ukrdc-exporter-celery:
+    <<: *radar-image
+    container_name: radar-ukrdc-exporter-celery
+    network_mode: host
+    command:
+      - celery
+      - -A
+      - radar.ukrdc_exporter.worker
+      - worker
+      - -n
+      - ukrdc_exporter@%h
+      - -Q
+      - ukrdc_exporter
+      - --loglevel
+      - INFO
+    environment:
+      - RADAR_SETTINGS=/etc/radar-ukrdc-exporter/settings.py
+    volumes:
+      - ./settings/radar-ukrdc-exporter/settings.py:/etc/radar-ukrdc-exporter/settings.py:ro
+      - /var/lib/radar-ukrdc-exporter/state:/var/lib/radar-ukrdc-exporter/state
 
-
+  # Client - published to 127.0.0.1:8080. Host nginx needs updating to
+  # proxy_pass here instead of serving /srv/radar-client/current directly.
+  radar-client:
+    build:
+      context: ./radar-client
+      dockerfile: Dockerfile
+      target: prod
+    image: radar-client:${RADAR_CLIENT_VERSION:-latest}
+    restart: unless-stopped
+    container_name: radar-client
+    ports:
+      - "127.0.0.1:8080:80"

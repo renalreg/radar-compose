@@ -1,17 +1,26 @@
 #!/bin/bash
+set -euo pipefail
 
-docker compose -f docker-compose-dev.yaml down
-docker compose -f docker-compose-dev.yaml up -d --build
+RADAR_VERSION=$(grep -m1 '^version' radar/pyproject.toml | sed -E 's/version = "(.*)"/\1/')
+RADAR_CLIENT_VERSION=$(grep -m1 '"version"' radar-client/package.json | sed -E 's/.*"version": *"([^"]+)".*/\1/')
 
 rm -rf radar-release
 mkdir radar-release
 
-# --- CLIENT --- #
-docker exec -it radar-client //bin//bash //app//build.sh
-CLIENT_DIST_PATH=$(docker exec radar-client //usr//bin//find //app -name radar-client*.tar.gz)
-docker cp radar-client:$CLIENT_DIST_PATH ./radar-release/
+# Bundle the versions so they travel with the tarballs - copy this .env
+# alongside docker-compose-prod.yaml on the server so `docker compose up`
+# picks the right tags automatically instead of needing them set by hand.
+cat > radar-release/.env << ENVEOF
+RADAR_VERSION=$RADAR_VERSION
+RADAR_CLIENT_VERSION=$RADAR_CLIENT_VERSION
+ENVEOF
 
-# --- API --- #
-docker exec -it radar-api //bin//bash -c 'source //radar//venv//bin//activate && platter build --virtualenv-version 15.1.0 -p python3 -r requirements.txt .'
-API_DIST_PATH=$(docker exec radar-api //usr//bin//find //radar -name radar-*-linux-x86_64.tar.gz)
-docker cp radar-api:$API_DIST_PATH ./radar-release/
+# --- API / Admin / UKRDC importer & exporter (all share one image) --- #
+docker build --target prod -t radar:"$RADAR_VERSION" ./radar
+docker save radar:"$RADAR_VERSION" | gzip > radar-release/radar-"$RADAR_VERSION".tar.gz
+
+# --- CLIENT --- #
+docker build --target prod -t radar-client:"$RADAR_CLIENT_VERSION" ./radar-client
+docker save radar-client:"$RADAR_CLIENT_VERSION" | gzip > radar-release/radar-client-"$RADAR_CLIENT_VERSION".tar.gz
+
+echo "Built radar:$RADAR_VERSION and radar-client:$RADAR_CLIENT_VERSION"

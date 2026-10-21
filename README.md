@@ -126,7 +126,7 @@ BASE_URL = "https://nww.radar.nhs.uk/#"
 LIVE = True
 READ_ONLY = False
 
-CELERY_BROKER_URL = "amqp://guest@localhost//"
+CELERY_BROKER_URL = "amqp://guest@host.docker.internal//"
 CELERY_RESULT_BACKEND = "rpc://"
 CELERY_RESULT_PERSISTENT = False
 
